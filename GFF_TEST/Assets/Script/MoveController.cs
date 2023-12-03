@@ -1,25 +1,63 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Windows;
 
 public class MoveController : MonoBehaviour, PlayerAct.IPlayerActionActions
 {
+    [Tooltip("移動に使うRigidbody")]
+    [SerializeField]new  Rigidbody rigidbody;
 
-    [SerializeField]  Rigidbody rigidbody;
-    Vector3 playerMoveVec=Vector3.zero;
+    [Tooltip("プレイヤーの移動ベクトル")]
+    Vector3 velocity;
 
+    [Tooltip("プレイヤーの移動速度")]
+    [SerializeField]float speed = 5;
+
+    [Tooltip("InputActionで設定した独自のAction")]
     PlayerAct.PlayerActionActions input;
+
+    //[Tooltip("GameObjectのTransform")]
+    //Transform _transform;
+
+    [Tooltip("徐々に回転させるための目標Quaternion")]
+    Quaternion targetRot;
+
+    [Tooltip("回転の速度")]
+    float rotateStep = 0.1f;
+
+    [Tooltip("どの角度から回転終わりとみなすかの値")]
+    float rotationAngle=1f;
+
     void Awake()
     {
         // インプットを生成して、自身をコールバックとして登録
         input = new PlayerAct.PlayerActionActions(new PlayerAct());
         input.SetCallbacks(this);
+
     }
+
+
     // インプットの有効・無効化
     void OnDestroy() => input.Disable();
     void OnEnable() => input.Enable();
+
+    private void Update()
+    {
+        var speedPow=speed;
+        transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, rotateStep);
+       // Debug.Log("rota"+transform.rotation.eulerAngles);
+        Debug.Log("Tage" + targetRot.eulerAngles);
+        if(transform.rotation.eulerAngles.y - targetRot.eulerAngles.y>= rotationAngle)
+        {
+            speedPow = 0.5f;
+        }
+        //移動方向と速度で動かす
+        rigidbody.velocity = velocity * speedPow;
+    }
 
 
     void OnDisable() => input.Disable();
@@ -30,14 +68,48 @@ public class MoveController : MonoBehaviour, PlayerAct.IPlayerActionActions
 
     public void OnMove(InputAction.CallbackContext context)
     {
-        // カメラの方向から、X-Z平面の単位ベクトルを取得
-        Vector3 cameraForward = Vector3.Scale(Camera.main.transform.forward, new Vector3(1, 0, 1)).normalized;
-        // 方向キーの入力値とカメラの向きから、移動方向を決定
-        Vector3 moveForwardVec = context.ReadValue<Vector2>().y*Camera.main.transform.forward+context.ReadValue<Vector2>().x * Camera.main.transform.right;
+        //入力をベクトルへ
+        velocity=new Vector3(context.ReadValue<Vector2>().x, 0,context.ReadValue<Vector2>().y).normalized;
+        
+        //入力なしの対策
+        if (velocity.magnitude <= 0.1f) velocity=Vector3.zero;
+        
+        //移動方向へ回転
+        AdjustDirection(context.ReadValue<Vector2>());
+        //Debug.Log(velocity);
+    }
 
-        transform.rotation = Quaternion.LookRotation(moveForwardVec);
-        Debug.Log(moveForwardVec);
-        moveForwardVec*=10;
-        rigidbody.AddForce(moveForwardVec,ForceMode.Force);
+    private void AdjustDirection(Vector2 _inputVec)
+    {
+
+        var delta = new Vector3(_inputVec.x,0,_inputVec.y);
+        if (delta.magnitude <= 0.1f)
+        {
+            delta = Vector3.zero; return;
+        }
+
+        // 進行方向（移動量ベクトル）に向くようなクォータニオンを取得
+        var rotation = Quaternion.LookRotation(delta, Vector3.up);
+        // オブジェクトの回転に反映
+        targetRot = rotation;
+    }
+
+    /// <summary>
+    /// アニメーションのコントローラーに、キャラクター用移動ベクトルの大きさを渡す
+    /// </summary>
+    /// <returns>移動ベクトルの大きさ/Velocity.magnitude</returns>
+    public float GetMoveVectorMagnitude()
+    {
+        return velocity.magnitude;
+    }
+    public bool IsRotation()
+    {
+        if (Math.Abs(transform.rotation.eulerAngles.y - targetRot.eulerAngles.y) >= rotationAngle)
+        {
+            
+            return true;
+        }
+
+        return false;
     }
 }
