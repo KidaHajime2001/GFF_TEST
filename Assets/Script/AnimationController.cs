@@ -24,9 +24,6 @@ public class AnimationController : MonoBehaviour
         AddDic();
 
         animController = GetComponent<Animator>();
-        
-        
-
     }
 
     // Update is called once per frame

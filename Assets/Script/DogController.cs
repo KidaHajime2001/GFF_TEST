@@ -7,9 +7,10 @@ using UnityEngine.AI;
 public class DogController : MonoBehaviour
 {
     [SerializeField] GameObject targetObject;
+    [SerializeField] BaseManager baseManager;
 
     NavMeshAgent agent;
-    float attackDistance=3f;
+    float attackDistance = 3f;
     bool isAttack=false;
     // Start is called before the first frame update
     void Start()
@@ -20,6 +21,7 @@ public class DogController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+
         // NavMesh‚ª€”õ‚Å‚«‚Ä‚¢‚é‚È‚ç
         if (agent.pathStatus != NavMeshPathStatus.PathInvalid)
         {
@@ -32,7 +34,14 @@ public class DogController : MonoBehaviour
             agent.isStopped = true;
             isAttack = true;
         }
-
+        if (Input.GetKeyDown(KeyCode.O))
+        {
+            Debug.Log("ddddd");
+            agent.isStopped = false;
+            isAttack = false;
+            agent.SetDestination(baseManager.GetComponent<BaseManager>().GetNearBasesPosition(transform.position));
+            ;
+        }
     }
 
     public float GetMoveVectorMagnitude()
@@ -44,10 +53,8 @@ public class DogController : MonoBehaviour
         Debug.Log(agent.angularSpeed);
         if (agent.angularSpeed>=30f)
         {
-
             return true;
         }
-
         return false;
     }
     public bool IsAttack() 
