@@ -34,7 +34,7 @@ public class AnimationController : MonoBehaviour
             moveController.GetMoveVectorMagnitude()
             );
 
-        animController.SetBool(parameterNameDic[ParameterName.IsRotation], moveController.IsRotation());
+        //animController.SetBool(parameterNameDic[ParameterName.IsRotation], moveController.IsRotation());
 
     }
     /// <summary>
