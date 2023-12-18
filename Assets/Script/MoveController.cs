@@ -161,4 +161,9 @@ public class MoveController : MonoBehaviour, PlayerAct.IPlayerActionActions
     {
         Gizmos.DrawWireSphere(transform.position + groundCheckOffsetY * Vector3.up, groundCheckRadius);
     }
+
+    public void OnRun(InputAction.CallbackContext context)
+    {
+        throw new NotImplementedException();
+    }
 }
