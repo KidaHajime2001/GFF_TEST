@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Net.NetworkInformation;
 using System.Threading;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -45,17 +46,23 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
     [Tooltip("ジャンプフラグ　false=ジャンプしていない,true=ジャンプしている")]
     bool jumpFlag;
 
-    [Tooltip("落下速度")]
-    float fallSpeed = 5.0f;
 
     [Tooltip("垂直の加速度")]
     float verticalVelocity;
 
     [Tooltip("ジャンプの力")]
-    float jumpPower = 5.0f;
+    public float jumpPower = 7.0f;
 
-    float gravity = -7.0f;
+    //[Tooltip("落下速度")]
+    //public float fallSpeed = 5.0f;
 
+    [Tooltip("重力")]
+    public float gravity = -10.0f;
+
+    [Tooltip("下限落下速度")]
+    public float LIMIT_FALL_SPEED = -10.0f;
+
+    [Tooltip("落下速度")]
     float animationBlend;
 
 
@@ -81,6 +88,9 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
     float coolTimeCountStart;
     bool jumpCoolTimeFlag=false;
 
+    float JETPACK_POWER=14;
+    bool jetFlag=false;
+
     void Awake()
     {
         // インプットを生成して、自身をコールバックとして登録
@@ -101,7 +111,7 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
         //Debug.Log("velo"+ verticalVelocity);
         if (CheckGroundStatus())
         {
-            Debug.Log("着地");
+            //Debug.Log("着地");
             
             if(jumpFlag)
             {
@@ -126,7 +136,6 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
         {
             jumpCoolTimeFlag = false;
         }
-
     }
 
     void SetAnimationID()
@@ -139,29 +148,41 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
 
     public void OnJump(InputAction.CallbackContext context)
     {
-        Debug.Log("jump");
-        if(!jumpFlag&&!jumpCoolTimeFlag)
+        if(!jumpFlag&&!jumpCoolTimeFlag&&context.started)
         {
             verticalVelocity = jumpPower;
             jumpFlag = true;
-            if(animator)
+            if (animator)
             {
-                animator.SetBool(animIDJump,true);
+                animator.SetBool(animIDJump, true);
             }
+        }
+        if(context.performed)
+        {
+            jetFlag = true;
+            Debug.Log("長押し" + jetFlag);
+        }
+        if(context.canceled&&jetFlag)
+        {
+            jetFlag = false;
+            Debug.Log("長押し終わり" + jetFlag);
         }
 
     }
     void CalculationGravity()
     {
-        if(!CheckGroundStatus())
+        var jet= jetFlag ? JETPACK_POWER : 0;
+        verticalVelocity += (gravity +jet) * Time.deltaTime;
+        Debug.Log("verticalVelocity:" + verticalVelocity);
+        if (!CheckGroundStatus())
         {
-            if (verticalVelocity < 0.0f)
+            
+            if (verticalVelocity < LIMIT_FALL_SPEED)
             {
-                verticalVelocity = -fallSpeed;
+                verticalVelocity = LIMIT_FALL_SPEED;
             }
         }
 
-        verticalVelocity += gravity * Time.deltaTime;
 
 
     }
@@ -170,17 +191,30 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
     {
         //入力をベクトルへ
         targetDirection = new Vector3(context.ReadValue<Vector2>().x, 0, context.ReadValue<Vector2>().y).normalized;
+        
 
         //入力なしの対策
         if (targetDirection.magnitude <= 0.1f) targetDirection = Vector3.zero;
 
         
+        //if(context.canceled)
+        //{
+        //    Debug.Log(context.ReadValue<Vector2>());
+        //}
+
 
     }
     void Move()
     {
+        Vector3 cameraForward = Vector3.Scale(Camera.main.transform.forward, new Vector3(1, 0, 1)).normalized;
+        //Debug.Log("CameraF:"+cameraForward+"<INPUT:"+targetDirection+">");
+
+        var moveVec = cameraForward * targetDirection.z + Camera.main.transform.right * targetDirection.x;
+        
         
         float targetSpeed = runFlag ? RUN_SPEED : WALK_SPEED;
+        float coef= jetFlag ? 5 : 1;
+        targetSpeed *= coef;
         if (targetDirection == Vector3.zero)
         {
             targetSpeed = 0;
@@ -213,21 +247,23 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
             animator.SetFloat(animIDSpeed, animationBlend);
         }
         //移動方向へ回転
-        AdjustDirection();
+        AdjustDirection(moveVec);
 
 
 
-        characterController.Move(targetDirection.normalized * (speed * Time.deltaTime) +
+        characterController.Move(moveVec.normalized * (speed * Time.deltaTime) +
             new Vector3(0.0f, verticalVelocity, 0.0f) * Time.deltaTime
             );
+
+        //Debug.Log("cameraF:" + cameraVec);
     }
 
 
-    private void AdjustDirection()
+    private void AdjustDirection(Vector3 _moveVec)
     {
         if (targetDirection != Vector3.zero)
         {
-            var targetRotation = Mathf.Atan2(targetDirection.x,targetDirection.z) * Mathf.Rad2Deg +Camera.main.transform.eulerAngles.y;
+            var targetRotation = Mathf.Atan2(_moveVec.x,_moveVec.z) * Mathf.Rad2Deg/* +Camera.main.transform.eulerAngles.y*/;
             float mRotation= Mathf.SmoothDampAngle(transform.eulerAngles.y, targetRotation, ref rotationVelocity, RotationSmoothTime);
 
             transform.rotation = Quaternion.Euler(0.0f, mRotation, 0.0f);
