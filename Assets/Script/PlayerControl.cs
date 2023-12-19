@@ -90,7 +90,8 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
 
     float JETPACK_POWER=14;
     bool jetFlag=false;
-
+    [SerializeField] private ParticleSystem particle;
+    //[SerializeField] GameObject particlePos;
     void Awake()
     {
         // インプットを生成して、自身をコールバックとして登録
@@ -106,6 +107,16 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
     void OnDisable() => input.Disable();
     void Update()
     {
+        if(jetFlag)
+        {
+            particle.Play();
+        }
+        else
+        {
+            particle.Stop();
+        }
+        
+
         Move();
         CalculationGravity();
         //Debug.Log("velo"+ verticalVelocity);
@@ -157,12 +168,12 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
                 animator.SetBool(animIDJump, true);
             }
         }
-        if(context.performed)
+        if (context.performed)
         {
             jetFlag = true;
             Debug.Log("長押し" + jetFlag);
         }
-        if(context.canceled&&jetFlag)
+        if (context.canceled && jetFlag)
         {
             jetFlag = false;
             Debug.Log("長押し終わり" + jetFlag);
@@ -213,7 +224,8 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
         
         
         float targetSpeed = runFlag ? RUN_SPEED : WALK_SPEED;
-        float coef= jetFlag ? 5 : 1;
+        float coef= jetFlag ? 5:1;
+        
         targetSpeed *= coef;
         if (targetDirection == Vector3.zero)
         {
