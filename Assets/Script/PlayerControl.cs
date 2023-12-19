@@ -6,6 +6,7 @@ using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.HID;
+using UnityEngine.InputSystem.XR;
 using UnityEngine.Windows;
 public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
 {
@@ -45,28 +46,48 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
     bool jumpFlag;
 
     [Tooltip("落下速度")]
-    float fallSpeed = 3.0f;
+    float fallSpeed = 5.0f;
 
     [Tooltip("垂直の加速度")]
     float verticalVelocity;
 
     [Tooltip("ジャンプの力")]
-    float jumpPower = 3.0f;
+    float jumpPower = 5.0f;
 
-    float gravity = -5.0f;
+    float gravity = -7.0f;
 
     float animationBlend;
 
 
-    float WALK_SPEED = 3.0f;
-    float RUN_SPEED = 6.0f;
+    float WALK_SPEED = 30.0f;
+    float RUN_SPEED = 100.0f;
+    float SPEED_CHANGE_RATE = 10.0f;
 
+    [Tooltip("How fast the character turns to face movement direction")]
+    [Range(0.0f, 0.3f)]
+    public float RotationSmoothTime = 0.12f;
+
+    private float rotationVelocity;
+
+    [Tooltip("アニメーションの管理に必要")]
+    Animator animator;
+
+    int animIDSpeed;
+    int animIDGround;
+    int animIDJump;
+    int animIDFreeFall;
+
+    float JUMP_COOL_TIME = 0.5f;
+    float coolTimeCountStart;
+    bool jumpCoolTimeFlag=false;
 
     void Awake()
     {
         // インプットを生成して、自身をコールバックとして登録
         input = new PlayerAct.PlayerActionActions(new PlayerAct());
         input.SetCallbacks(this);
+        animator = GetComponent<Animator>();
+        SetAnimationID();
     }
 
     void OnEnable() => input.Enable();
@@ -75,27 +96,58 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
     void OnDisable() => input.Disable();
     void Update()
     {
-        characterController.Move(targetDirection.normalized * (speed * Time.deltaTime)+
-            new Vector3(0.0f, verticalVelocity, 0.0f) * Time.deltaTime
-            );
-
+        Move();
         CalculationGravity();
         //Debug.Log("velo"+ verticalVelocity);
-        if(CheckGroundStatus())
+        if (CheckGroundStatus())
         {
             Debug.Log("着地");
+            
+            if(jumpFlag)
+            {
+                jumpCoolTimeFlag = true;
+                coolTimeCountStart = Time.time;
+            }
             jumpFlag = false;
+            if(animator)
+            {
+                animator.SetBool(animIDJump, false);
+                animator.SetBool(animIDFreeFall, false);
+                animator.SetBool(animIDGround, true);
+            }
+
         }
+        else
+        {
+            animator.SetBool(animIDGround, false);
+            animator.SetBool(animIDFreeFall, true);
+        }
+        if (jumpCoolTimeFlag&&JUMP_COOL_TIME<Time.time-coolTimeCountStart)
+        {
+            jumpCoolTimeFlag = false;
+        }
+
+    }
+
+    void SetAnimationID()
+    {
+        animIDSpeed = Animator.StringToHash("Speed");
+        animIDFreeFall = Animator.StringToHash("FreeFall");
+        animIDGround = Animator.StringToHash("Ground");
+        animIDJump = Animator.StringToHash("Jump");
     }
 
     public void OnJump(InputAction.CallbackContext context)
     {
         Debug.Log("jump");
-        if(!jumpFlag)
+        if(!jumpFlag&&!jumpCoolTimeFlag)
         {
             verticalVelocity = jumpPower;
             jumpFlag = true;
-
+            if(animator)
+            {
+                animator.SetBool(animIDJump,true);
+            }
         }
 
     }
@@ -116,38 +168,73 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
 
     public void OnMove(InputAction.CallbackContext context)
     {
-        Debug.Log(targetDirection.normalized);
         //入力をベクトルへ
         targetDirection = new Vector3(context.ReadValue<Vector2>().x, 0, context.ReadValue<Vector2>().y).normalized;
 
         //入力なしの対策
         if (targetDirection.magnitude <= 0.1f) targetDirection = Vector3.zero;
 
-        //移動方向へ回転
-        AdjustDirection(context.ReadValue<Vector2>());
+        
 
     }
     void Move()
     {
-        //float targetSpeed = ;
+        
+        float targetSpeed = runFlag ? RUN_SPEED : WALK_SPEED;
+        if (targetDirection == Vector3.zero)
+        {
+            targetSpeed = 0;
+        }
+        float currentHorizontalSpeed = new Vector3(characterController.velocity.x, 0.0f, characterController.velocity.z).magnitude;
+        float speedOffset = 0.1f;
+
+        if (currentHorizontalSpeed < targetSpeed - speedOffset ||
+                currentHorizontalSpeed > targetSpeed + speedOffset)
+        {
+            // creates curved result rather than a linear one giving a more organic speed change
+            // note T in Lerp is clamped, so we don't need to clamp our speed
+            speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed,
+                Time.deltaTime * SPEED_CHANGE_RATE);
+
+            // round speed to 3 decimal places
+            speed = Mathf.Round(speed * 1000f) / 1000f;
+
+        }
+        else
+        {
+            speed = targetSpeed;
+        }
+        
+        animationBlend = Mathf.Lerp(animationBlend,targetSpeed,Time.deltaTime * SPEED_CHANGE_RATE);
+        if (animator)
+        {
+
+            //Debug.Log("Speed:" + animationBlend);
+            animator.SetFloat(animIDSpeed, animationBlend);
+        }
+        //移動方向へ回転
+        AdjustDirection();
 
 
+
+        characterController.Move(targetDirection.normalized * (speed * Time.deltaTime) +
+            new Vector3(0.0f, verticalVelocity, 0.0f) * Time.deltaTime
+            );
     }
 
 
-    private void AdjustDirection(Vector2 _inputVec)
+    private void AdjustDirection()
     {
-
-        var delta = new Vector3(_inputVec.x, 0, _inputVec.y);
-        if (delta.magnitude <= 0.1f)
+        if (targetDirection != Vector3.zero)
         {
-            delta = Vector3.zero; return;
+            var targetRotation = Mathf.Atan2(targetDirection.x,targetDirection.z) * Mathf.Rad2Deg +Camera.main.transform.eulerAngles.y;
+            float mRotation= Mathf.SmoothDampAngle(transform.eulerAngles.y, targetRotation, ref rotationVelocity, RotationSmoothTime);
+
+            transform.rotation = Quaternion.Euler(0.0f, mRotation, 0.0f);
+
         }
 
-        // 進行方向（移動量ベクトル）に向くようなクォータニオンを取得
-        var rotation = Quaternion.LookRotation(delta, Vector3.up);
-        // オブジェクトの回転に反映
-        targetRot = rotation;
+      
     }
 
     public void OnRun(InputAction.CallbackContext context)

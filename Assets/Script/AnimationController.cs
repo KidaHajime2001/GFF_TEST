@@ -1,15 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+public enum ParameterName
+{
+    MoveVecMagnitude,
+    Speed,
+}
 
 public class AnimationController : MonoBehaviour
 {
-    enum ParameterName
-    {
-        MoveVecMagnitude,
-        IsRotation,
-    }
+    
     Dictionary<ParameterName,string> parameterNameDic = new Dictionary<ParameterName,string>();
 
 
@@ -23,7 +23,6 @@ public class AnimationController : MonoBehaviour
 
         AddDic();
 
-        animController = GetComponent<Animator>();
     }
 
     // Update is called once per frame
@@ -34,7 +33,6 @@ public class AnimationController : MonoBehaviour
             moveController.GetMoveVectorMagnitude()
             );
 
-        //animController.SetBool(parameterNameDic[ParameterName.IsRotation], moveController.IsRotation());
 
     }
     /// <summary>
@@ -43,6 +41,16 @@ public class AnimationController : MonoBehaviour
     void AddDic()
     {
         parameterNameDic.Add(ParameterName.MoveVecMagnitude,"MoveVecMagnitude");
-        parameterNameDic.Add(ParameterName.IsRotation, "IsRotation");
+        parameterNameDic.Add(ParameterName.Speed, "Speed");
     }
+
+    //public void SetParameterFloat(ParameterName _pN,)
+    //{
+    //    animController.SetFloat()
+    //}
+    //public void SetParameterBool(ParameterName _pN)
+    //{
+    //    animController.s
+    //}
+
 }
