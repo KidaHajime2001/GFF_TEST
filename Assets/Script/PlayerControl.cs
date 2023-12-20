@@ -66,9 +66,9 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
     float animationBlend;
 
 
-    float WALK_SPEED = 30.0f;
-    float RUN_SPEED = 100.0f;
-    float SPEED_CHANGE_RATE = 10.0f;
+    float WALK_SPEED = 2.0f;
+    float RUN_SPEED = 6.0f;
+    float SPEED_CHANGE_RATE = 3.0f;
 
     [Tooltip("How fast the character turns to face movement direction")]
     [Range(0.0f, 0.3f)]
@@ -83,14 +83,20 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
     int animIDGround;
     int animIDJump;
     int animIDFreeFall;
+    int animIDJet;
+    int animIDJetSpeed;
 
     float JUMP_COOL_TIME = 0.5f;
     float coolTimeCountStart;
     bool jumpCoolTimeFlag=false;
 
-    float JETPACK_POWER=14;
+    float JETPACK_POWER=13;
+    float JETPACK_MAX_SPEED;
     bool jetFlag=false;
-    [SerializeField] private ParticleSystem particle;
+    [SerializeField] private ParticleSystem jetParticle;
+    [SerializeField] GameObject jetPos;
+    [SerializeField] private ParticleSystem speedParticle;
+
     //[SerializeField] GameObject particlePos;
     void Awake()
     {
@@ -99,6 +105,7 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
         input.SetCallbacks(this);
         animator = GetComponent<Animator>();
         SetAnimationID();
+        JETPACK_MAX_SPEED = RUN_SPEED * 2.5f;
     }
 
     void OnEnable() => input.Enable();
@@ -109,13 +116,28 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
     {
         if(jetFlag)
         {
-            particle.Play();
+
+            jetParticle.transform.position = jetPos.transform.position;
+            jetParticle.Play();
+            animator.SetBool(animIDJet, jetFlag);
         }
         else
         {
-            particle.Stop();
+            jetParticle.Stop();
+
+            animator.SetBool(animIDJet, jetFlag);
         }
-        
+        if(runFlag && jetFlag)
+        {
+            speedParticle.Play();
+            animator.SetFloat(animIDJetSpeed, ((speed / JETPACK_MAX_SPEED) / 2));
+        }
+        else
+        {
+            speedParticle.Stop();
+
+            animator.SetFloat(animIDJetSpeed, ((speed / JETPACK_MAX_SPEED) / 2));
+        }
 
         Move();
         CalculationGravity();
@@ -155,6 +177,8 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
         animIDFreeFall = Animator.StringToHash("FreeFall");
         animIDGround = Animator.StringToHash("Ground");
         animIDJump = Animator.StringToHash("Jump");
+        animIDJet = Animator.StringToHash("Jet") ;
+        animIDJetSpeed = Animator.StringToHash("JetSpeed");
     }
 
     public void OnJump(InputAction.CallbackContext context)
@@ -184,7 +208,7 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
     {
         var jet= jetFlag ? JETPACK_POWER : 0;
         verticalVelocity += (gravity +jet) * Time.deltaTime;
-        Debug.Log("verticalVelocity:" + verticalVelocity);
+        //Debug.Log("verticalVelocity:" + verticalVelocity);
         if (!CheckGroundStatus())
         {
             
@@ -224,32 +248,33 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
         
         
         float targetSpeed = runFlag ? RUN_SPEED : WALK_SPEED;
-        float coef= jetFlag ? 5:1;
-        
-        targetSpeed *= coef;
+
         if (targetDirection == Vector3.zero)
         {
             targetSpeed = 0;
         }
-        float currentHorizontalSpeed = new Vector3(characterController.velocity.x, 0.0f, characterController.velocity.z).magnitude;
-        float speedOffset = 0.1f;
+        float coef = jetFlag ? 2.5f : 1;
 
-        if (currentHorizontalSpeed < targetSpeed - speedOffset ||
-                currentHorizontalSpeed > targetSpeed + speedOffset)
-        {
-            // creates curved result rather than a linear one giving a more organic speed change
-            // note T in Lerp is clamped, so we don't need to clamp our speed
-            speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed,
-                Time.deltaTime * SPEED_CHANGE_RATE);
+        targetSpeed *= coef;
+        //float currentHorizontalSpeed = new Vector3(characterController.velocity.x, 0.0f, characterController.velocity.z).magnitude;
+        //float speedOffset = 0.1f;
 
-            // round speed to 3 decimal places
-            speed = Mathf.Round(speed * 1000f) / 1000f;
+        //if (currentHorizontalSpeed < targetSpeed - speedOffset ||
+        //        currentHorizontalSpeed > targetSpeed + speedOffset)
+        //{
+        //    // creates curved result rather than a linear one giving a more organic speed change
+        //    // note T in Lerp is clamped, so we don't need to clamp our speed
+        speed = Mathf.Lerp(speed, targetSpeed,Time.deltaTime * SPEED_CHANGE_RATE);
 
-        }
-        else
-        {
-            speed = targetSpeed;
-        }
+        //    // round speed to 3 decimal places
+            //speed = Mathf.Round(speed * 1000f) / 1000f;
+
+        Debug.Log(speed);
+        //}
+        //else
+        //{
+          //  speed = targetSpeed;
+        //}
         
         animationBlend = Mathf.Lerp(animationBlend,targetSpeed,Time.deltaTime * SPEED_CHANGE_RATE);
         if (animator)
@@ -258,9 +283,9 @@ public class PlayerControl : MonoBehaviour, PlayerAct.IPlayerActionActions
             //Debug.Log("Speed:" + animationBlend);
             animator.SetFloat(animIDSpeed, animationBlend);
         }
+        
         //ˆÚ“®•ûŒü‚Ö‰ñ“]
         AdjustDirection(moveVec);
-
 
 
         characterController.Move(moveVec.normalized * (speed * Time.deltaTime) +
