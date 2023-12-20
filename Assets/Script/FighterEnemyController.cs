@@ -1,55 +1,48 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
-public class DogController : MonoBehaviour
+public class FighterEnemyController : MonoBehaviour
 {
-
-
     [SerializeField] GameObject targetObject;
     [SerializeField] BaseManager baseManager;
-
     NavMeshAgent agent;
-    float attackDistance = 3f;
-    bool isAttack=false;
+    float attackDistance =3.0f;
+    bool isAttack = false;
 
+    Animator animator;
     int animIDAttackFlag;
     int animIDSpeed;
 
-    Animator animator;
 
     private void Awake()
     {
         animator = GetComponent<Animator>();
-
+        agent = GetComponent<NavMeshAgent>();
     }
-
-    void SetAnimationID()
+    void SetAnimatorID()
     {
-        animIDSpeed      = Animator.StringToHash("Speed");
-        animIDAttackFlag = Animator.StringToHash("AttackFlag");
-    }
+        animIDSpeed = Animator.StringToHash("Speed");
+        animIDAttackFlag = Animator.StringToHash("IsAttack");
 
+    }
 
     // Start is called before the first frame update
     void Start()
     {
-        agent = GetComponent<NavMeshAgent>();    
+        SetAnimatorID();
     }
 
     // Update is called once per frame
     void Update()
-    {
-
-        // NavMeshが準備できているなら
+    {        // NavMeshが準備できているなら
         if (agent.pathStatus != NavMeshPathStatus.PathInvalid)
         {
             // NavMeshAgentに目的地をセット
             agent.SetDestination(targetObject.transform.position);
         }
-        if(Vector3.Distance( agent.transform.position,targetObject.transform.position)<=attackDistance)
+        if (Vector3.Distance(agent.transform.position, targetObject.transform.position) <= attackDistance)
         {
             Debug.Log("到着");
             agent.isStopped = true;
@@ -57,29 +50,24 @@ public class DogController : MonoBehaviour
         }
         if (Input.GetKeyDown(KeyCode.O))
         {
-            Debug.Log("ddddd");
             agent.isStopped = false;
             isAttack = false;
             agent.SetDestination(baseManager.GetComponent<BaseManager>().GetNearBasesPosition(transform.position));
             ;
         }
+        if (isAttack)
+        {
+            animator.SetBool(animIDAttackFlag,true);
+        }
+        else
+        {
+            Debug.Log(agent.speed);
+            animator.SetBool(animIDAttackFlag, false);
+            animator.SetFloat(animIDSpeed, agent.speed);
+        }
+        
+
     }
 
-    public float GetMoveVectorMagnitude()
-    {
-        return agent.velocity.magnitude;
-    }
-    public bool IsRotation()
-    {
-        Debug.Log(agent.angularSpeed);
-        if (agent.angularSpeed>=30f)
-        {
-            return true;
-        }
-        return false;
-    }
-    public bool IsAttack() 
-    {
-        return isAttack;
-    }
+
 }
